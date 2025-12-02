@@ -304,6 +304,45 @@ const WorkspaceGrid = ({ views, onUpdateView, onUpdateViews, onDeleteView, onEdi
     return maxBelow;
   };
 
+  const handleUpdateViewLocal = useCallback((viewUuid, updatedView) => {
+    if (onUpdateViews) {
+      onUpdateViews(views.map(v => v.uuid === viewUuid ? updatedView : v));
+    } else if (onUpdateView) {
+      onUpdateView(viewUuid, updatedView);
+    }
+  }, [onUpdateViews, onUpdateView, views]);
+
+  // PATCH-запрос при изменении блока
+  const patchView = useCallback(async (view) => {
+    if (!dashboardUuid || !view?.uuid) return;
+    const patchBody = {
+      title: view.title,
+      description: view.description,
+      target: view.target,
+      type: view.type,
+      width: view.width,
+      height: view.height,
+      x: view.x,
+      y: view.y
+    };
+    try {
+      const response = await fetch(`https://dashboard.test.qodeq.net/api/v1/view/${dashboardUuid}/${view.uuid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchBody)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Patch error response:', errorText);
+        throw new Error(`Failed to update view: ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Error patching view:', err);
+      // Можно добавить уведомление пользователю
+    }
+  }, [dashboardUuid]);
+
   const handleMouseDown = useCallback((e, viewUuid, isResize = false, handle = null) => {
     e.preventDefault();
     e.stopPropagation();
@@ -423,6 +462,8 @@ const WorkspaceGrid = ({ views, onUpdateView, onUpdateViews, onDeleteView, onEdi
           newHeight = Math.max(MIN_HEIGHT, snapToGrid(resizeState.startSize.height - deltaY));
           newY = resizeState.startViewPos.y + (resizeState.startSize.height - newHeight);
           break;
+        default:
+          break;
       }
 
       // Ограничиваем размеры и позицию так, чтобы правая/нижняя граница не выходила за пределы
@@ -446,7 +487,7 @@ const WorkspaceGrid = ({ views, onUpdateView, onUpdateViews, onDeleteView, onEdi
         setPendingPatchView(newView);
       }
     }
-  }, [dragState, resizeState, views, getWorkspaceRect]);
+  }, [dragState, resizeState, views, getWorkspaceRect, checkCollision, handleUpdateViewLocal]);
 
   // PATCH только после mouseup
   const handleMouseUp = useCallback(() => {
@@ -477,7 +518,7 @@ const WorkspaceGrid = ({ views, onUpdateView, onUpdateViews, onDeleteView, onEdi
       startViewPos: { x: 0, y: 0 }
     });
     setDropZone({ visible: false, x: 0, y: 0, width: 0, height: 0, hasCollision: false });
-  }, [pendingPatchView, views]);
+  }, [pendingPatchView, views, handleUpdateViewLocal, patchView]);
 
   // Глобальные обработчики событий
   React.useEffect(() => {
@@ -495,47 +536,7 @@ const WorkspaceGrid = ({ views, onUpdateView, onUpdateViews, onDeleteView, onEdi
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
     };
-  }, [dragState.isDragging, resizeState.isResizing, handleMouseMove, handleMouseUp]);
-
-
-  const handleUpdateViewLocal = (viewUuid, updatedView) => {
-    if (onUpdateViews) {
-      onUpdateViews(views.map(v => v.uuid === viewUuid ? updatedView : v));
-    } else if (onUpdateView) {
-      onUpdateView(viewUuid, updatedView);
-    }
-  };
-
-  // PATCH-запрос при изменении блока
-  const patchView = async (view) => {
-    if (!dashboardUuid || !view?.uuid) return;
-    const patchBody = {
-      title: view.title,
-      description: view.description,
-      target: view.target,
-      type: view.type,
-      width: view.width,
-      height: view.height,
-      x: view.x,
-      y: view.y
-    };
-    try {
-      const response = await fetch(`https://dashboard.test.qodeq.net/api/v1/view/${dashboardUuid}/${view.uuid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patchBody)
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Patch error response:', errorText);
-        throw new Error(`Failed to update view: ${response.status}`);
-      }
-    } catch (err) {
-      console.error('Error patching view:', err);
-      // Можно добавить уведомление пользователю
-    }
-  };
+  }, [dragState.isDragging, resizeState.isResizing, resizeState.handle, handleMouseMove, handleMouseUp]);
 
   const handleDeleteView = (viewUuid) => {
     const confirmed = window.confirm('Вы уверены, что хотите удалить этот блок?');

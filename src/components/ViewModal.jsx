@@ -169,11 +169,6 @@ const Select = styled.select`
   }
 `;
 
-const FormRow = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-`;
 
 const ModalActions = styled.div`
   display: flex;
@@ -454,7 +449,7 @@ const ViewModal = ({ isOpen, onClose, onAdd, onUpdateView, editingView }) => {
     }
   };
 
-  const initializeForm = () => {
+  useEffect(() => {
     if (editingView) {
       setFormData({
         title: editingView.title || '',
@@ -476,10 +471,6 @@ const ViewModal = ({ isOpen, onClose, onAdd, onUpdateView, editingView }) => {
         step: ''
       });
     }
-  };
-
-  useEffect(() => {
-    initializeForm();
   }, [editingView]);
 
   const handleClose = () => {
